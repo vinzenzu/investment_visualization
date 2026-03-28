@@ -1,0 +1,1252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monte Carlo Investment Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#05050d;--panel:#08081a;--panel2:#0c0c20;--panel3:#101028;
+  --border:#181840;--border2:#20205a;
+  --text:#dde4f5;--dim:#7a85b4;--muted:#52567e;
+  --font:'JetBrains Mono',monospace;
+}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:12px;display:flex;flex-direction:column}
+
+.hdr{display:flex;align-items:center;padding:0 16px;height:40px;border-bottom:1px solid var(--border);background:var(--panel);flex-shrink:0;gap:12px}
+.hdr-title{font-size:10.5px;font-weight:700;letter-spacing:.18em;text-transform:uppercase}
+.hdr-sub{font-size:9px;color:var(--dim);letter-spacing:.07em}
+.hdr-pill{margin-left:auto;font-size:8px;color:#6068a0;border:1px solid var(--border);padding:2px 8px;border-radius:2px;letter-spacing:.1em}
+
+.app{display:flex;flex:1;min-height:0}
+
+/* SIDEBAR */
+.sb{
+  width:270px;min-width:190px;max-width:520px;
+  flex-shrink:0;
+  background:linear-gradient(180deg,var(--panel) 0%,#060614 100%);
+  overflow-y:auto;overflow-x:hidden;
+  display:flex;flex-direction:column;
+  padding:12px 10px 14px;gap:14px;
+  transition:width .25s ease,min-width .25s ease,padding .25s ease;
+}
+.sb::-webkit-scrollbar{width:2px}
+.sb::-webkit-scrollbar-thumb{background:var(--border2)}
+
+/* DRAG HANDLE */
+.sb-handle{
+  width:5px;flex-shrink:0;
+  background:var(--border);
+  cursor:col-resize;
+  transition:background .15s;
+}
+.sb-handle:hover,.sb-handle.active{background:var(--border2)}
+
+.sec{font-size:8px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+
+/* ASSET BUTTONS */
+.alist{display:flex;flex-direction:column;gap:1px}
+.abtn{display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:4px;border:1px solid transparent;cursor:pointer;background:transparent;color:var(--dim);font-size:10px;font-family:var(--font);text-align:left;width:100%;transition:all .1s}
+.abtn:hover{background:var(--panel2)}
+.abtn.on{border-color:rgba(var(--cr),var(--cg),var(--cb),.3);background:rgba(var(--cr),var(--cg),var(--cb),.06);color:var(--text)}
+.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;background:var(--c,#555);opacity:.25;transition:opacity .1s}
+.abtn.on .dot{opacity:1}
+.albl{flex:1}
+.arat{font-size:8.5px;color:var(--muted);transition:color .1s;white-space:nowrap}
+.abtn.on .arat{color:rgba(var(--cr),var(--cg),var(--cb),.6)}
+
+/* SEGMENTED HORIZONTAL */
+.seg{display:flex;background:var(--panel2);border:1px solid var(--border);border-radius:4px;padding:2px;gap:1px;flex-wrap:wrap}
+.sbtn{flex:1;padding:4px 3px;border:none;border-radius:3px;background:transparent;color:var(--dim);font-size:9px;font-family:var(--font);cursor:pointer;transition:all .1s;white-space:nowrap;text-align:center;min-width:0}
+.sbtn.on{background:#14164a;color:var(--text)}
+.sbtn:hover:not(.on){background:rgba(255,255,255,.03)}
+
+/* SEGMENTED VERTICAL (bands) */
+.seg-v{display:flex;flex-direction:column;background:var(--panel2);border:1px solid var(--border);border-radius:4px;padding:2px;gap:1px}
+.seg-v .sbtn{flex:none;padding:5px 8px;text-align:left;white-space:normal;font-size:9px;line-height:1.3}
+
+/* SLIDERS */
+.arows{display:flex;flex-direction:column;gap:0}
+.arow{display:flex;align-items:center;gap:5px;padding:3px 0}
+.an{width:44px;font-size:9px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0}
+input[type=range]{flex:1;height:2px;appearance:none;-webkit-appearance:none;background:var(--border);border-radius:2px;cursor:pointer;outline:none;min-width:0}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:9px;height:9px;border-radius:50%;background:var(--tc,#4ade80);cursor:pointer;transition:transform .1s}
+input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.3)}
+input[type=range]::-moz-range-thumb{width:9px;height:9px;border-radius:50%;border:none;background:var(--tc,#4ade80)}
+.av{width:30px;font-size:9px;color:var(--text);text-align:right;font-variant-numeric:tabular-nums;flex-shrink:0}
+.afoot{display:flex;justify-content:space-between;padding:3px 0 0;font-size:8.5px}
+.ok{color:#4ade80}.err{color:#f87171}.mut{color:var(--muted)}
+
+.rbtn{width:100%;margin-top:6px;padding:6px 10px;background:var(--panel3);border:1px solid var(--border2);color:var(--dim);border-radius:4px;font-size:9.5px;font-family:var(--font);letter-spacing:.08em;cursor:pointer;transition:all .12s}
+.rbtn:hover{background:#14164e;border-color:#242680;color:var(--text)}
+
+select{width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);padding:5px 7px;border-radius:4px;font-size:10px;font-family:var(--font);cursor:pointer;outline:none}
+
+/* ASSUMPTIONS TABLE */
+.assump-grid{display:grid;grid-template-columns:1fr 52px 52px;gap:3px 4px;align-items:center}
+.ag-hdr{font-size:7.5px;color:var(--muted);text-align:right;padding-bottom:2px;letter-spacing:.05em}
+.ag-name{font-size:8.5px;color:var(--dim);display:flex;align-items:center;gap:4px}
+.ag-inp{
+  width:100%;background:var(--panel2);border:1px solid var(--border);
+  color:var(--text);padding:2px 4px;border-radius:3px;font-size:9px;
+  font-family:var(--font);text-align:right;outline:none;
+}
+.ag-inp:focus{border-color:var(--border2)}
+.ag-inp:disabled{color:var(--dim);background:transparent;border-color:var(--border);cursor:default}
+.pl-tag{
+  font-size:7px;color:#c97a20;background:#140c02;border:1px solid #5a3010;
+  border-radius:2px;padding:1px 4px;cursor:pointer;user-select:none;
+  white-space:nowrap;transition:all .1s;flex-shrink:0
+}
+.pl-tag:hover{background:#1e1203}
+.pl-tag.off{color:var(--muted);border-color:var(--border);background:transparent}
+.btc-note{font-size:7.5px;color:#c0912e;line-height:1.5;margin-top:4px}
+
+/* CHART PANEL */
+.cp{flex:1;display:flex;flex-direction:column;padding:10px 14px 8px;gap:8px;min-width:0}
+.ctop{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.clbl{font-size:8px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;white-space:nowrap}
+#btcHint{font-size:8px;color:#e09040;background:#140c02;border:1px solid #5a3010;border-radius:3px;padding:2px 8px;display:none}
+.cw{flex:1;position:relative;min-height:0}
+canvas{position:absolute;inset:0}
+
+.cfoot{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.li{display:flex;align-items:center;gap:4px}
+.ll{width:16px;height:2px;background:#444;border-radius:1px}
+.lb{width:16px;height:7px;background:#444;border-radius:2px}
+.lt{font-size:8.5px;color:var(--dim)}
+.fn{margin-left:auto;font-size:8px;color:#52567e}
+
+.disc{font-size:8px;color:#52567e;line-height:1.7}
+
+#loading{position:fixed;inset:0;background:rgba(5,5,13,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:1000}
+#loading.hidden{display:none}
+.spin{width:26px;height:26px;border:2px solid var(--border2);border-top-color:#4a52cc;border-radius:50%;animation:sp .7s linear infinite}
+.ltxt{font-size:9.5px;letter-spacing:.2em;color:var(--dim);text-transform:uppercase}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* SIDEBAR COLLAPSED (desktop) */
+.sb.collapsed{width:0!important;min-width:0!important;padding:0!important;overflow:hidden}
+.sb-handle.sb-hidden{display:none}
+#sbToggle.collapsed{transform:scaleX(-1)}
+
+/* HEADER ICON BUTTONS */
+.hdr-icon-btn{width:44px;height:40px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:4px;background:transparent;border:none;cursor:pointer;color:var(--dim);font-family:var(--font);font-size:14px;flex-shrink:0;transition:color .15s;padding:0}
+.hdr-icon-btn:hover{color:var(--text)}
+#hamburger span{display:block;width:16px;height:2px;background:currentColor;border-radius:1px}
+#hamburger{display:none}
+#sbToggle{display:flex}
+
+/* MOBILE OVERLAY BACKDROP */
+.sb-overlay{display:none;position:fixed;inset:0;top:40px;background:rgba(5,5,13,.65);z-index:199;opacity:0;pointer-events:none;transition:opacity .25s}
+.sb-overlay.visible{opacity:1;pointer-events:auto}
+
+/* SELECTION BOX */
+.sel-box{position:absolute;top:0;bottom:0;pointer-events:none;background:rgba(74,82,204,.18);border-left:1px solid rgba(74,82,204,.6);border-right:1px solid rgba(74,82,204,.6);display:none;z-index:10}
+
+/* CHART MODE/RESET BUTTONS */
+.chart-mode-group{display:flex;background:var(--panel2);border:1px solid var(--border);border-radius:4px;padding:2px;gap:1px}
+.chart-mode-btn{padding:3px 8px;border:none;border-radius:3px;background:transparent;color:var(--dim);font-size:8px;font-family:var(--font);letter-spacing:.1em;cursor:pointer;transition:all .1s;white-space:nowrap}
+.chart-mode-btn.on{background:#14164a;color:var(--text)}
+.chart-mode-btn:hover:not(.on){background:rgba(255,255,255,.03)}
+.chart-reset-btn{padding:3px 8px;border:1px solid var(--border2);border-radius:3px;background:var(--panel2);color:#f97316;font-size:8px;font-family:var(--font);letter-spacing:.1em;cursor:pointer;transition:all .12s}
+.chart-reset-btn:hover{background:#1e1203;border-color:#5a3010}
+.chart-widen-btn{padding:3px 8px;border:1px solid var(--border2);border-radius:3px;background:var(--panel2);color:#60a5fa;font-size:8px;font-family:var(--font);letter-spacing:.1em;cursor:pointer;transition:all .12s}
+.chart-widen-btn:hover{background:#060e1a;border-color:#1e3a6a}
+
+/* MOBILE */
+@media(max-width:768px){
+  #sbToggle{display:none}
+  #hamburger{display:flex}
+  .sb{position:fixed;top:40px;left:0;bottom:0;width:280px!important;min-width:0!important;max-width:85vw!important;z-index:200;transform:translateX(-100%);transition:transform .25s ease;overflow-y:auto}
+  .sb.mobile-open{transform:translateX(0)}
+  .sb-handle{display:none}
+  .sb-overlay{display:block}
+  .cp{padding:8px 8px 6px}
+  .sbtn,.abtn,.rbtn,select,.chart-mode-btn,.chart-reset-btn,.chart-widen-btn{min-height:44px}
+  .sbtn,.abtn{display:flex;align-items:center;justify-content:center}
+}
+</style>
+</head>
+<body>
+
+<div id="loading"><div class="spin"></div><div class="ltxt">Running simulations…</div></div>
+
+<header class="hdr">
+  <button id="hamburger" class="hdr-icon-btn" aria-label="Toggle sidebar"><span></span><span></span><span></span></button>
+  <button id="sbToggle" class="hdr-icon-btn" title="Hide/show sidebar">&#x25C0;</button>
+  <div class="hdr-title">Monte Carlo Investment Simulator</div>
+  <div class="hdr-sub">GBM · Cholesky-Correlated · Percentile Bands</div>
+  <div class="hdr-pill">$100,000 INITIAL · 200 PATHS · WEEKLY STEPS</div>
+</header>
+
+<div class="app">
+<aside class="sb" id="sidebar">
+
+  <div>
+    <div class="sec">Assets</div>
+    <div class="alist" id="assetList"></div>
+  </div>
+
+  <div>
+    <div class="sec">Time Horizon</div>
+    <div class="seg" id="horizSeg">
+      <button class="sbtn" data-v="5">5yr</button>
+      <button class="sbtn" data-v="10">10yr</button>
+      <button class="sbtn on" data-v="20">20yr</button>
+      <button class="sbtn" data-v="30">30yr</button>
+    </div>
+  </div>
+
+  <div>
+    <div class="sec">Display</div>
+    <div class="seg" id="modeSeg">
+      <button class="sbtn on" data-v="nominal">Nominal</button>
+      <button class="sbtn" data-v="real">Real (infl-adj)</button>
+    </div>
+  </div>
+
+  <div>
+    <div class="sec">Y-Axis Scale</div>
+    <div class="seg" id="scaleSeg">
+      <button class="sbtn on" data-v="linear">Linear</button>
+      <button class="sbtn" data-v="log">Logarithmic</button>
+    </div>
+  </div>
+
+  <div>
+    <div class="sec">Percentile Bands</div>
+    <div class="seg-v" id="bandsSeg">
+      <button class="sbtn" data-v="both">P10–90 + P25–75</button>
+      <button class="sbtn" data-v="outer">Outer only (P10–90)</button>
+      <button class="sbtn" data-v="inner">Inner only (P25–75)</button>
+      <button class="sbtn on" data-v="none">None</button>
+      <button class="sbtn" data-v="wide">Wide: P5–95 + P10–90</button>
+      <button class="sbtn" data-v="extreme">Tails: P1–99 + P5–95</button>
+    </div>
+  </div>
+
+  <div>
+    <div class="sec">Portfolio Allocations</div>
+    <div class="arows" id="allocRows"></div>
+    <div class="afoot">
+      <span class="ok" id="atotal">Total: 100%</span>
+      <span class="mut">must = 100%</span>
+    </div>
+    <button class="rbtn" id="runBtn">&#9654;&nbsp; RUN SIMULATION</button>
+  </div>
+
+  <div>
+    <div class="sec">Rebalancing</div>
+    <select id="rebalSel">
+      <option value="4">Monthly (~4 wks)</option>
+      <option value="13">Quarterly (~13 wks)</option>
+      <option value="52" selected>Annually (52 wks)</option>
+      <option value="0">Never (buy &amp; hold)</option>
+    </select>
+  </div>
+
+  <div>
+    <div class="sec">Assumptions <span class="mut" style="font-size:7px;letter-spacing:0;text-transform:none">— RUN to apply</span></div>
+    <div class="assump-grid" id="assumpGrid"></div>
+    <div class="btc-note" id="btcNote"></div>
+  </div>
+
+  <div>
+    <div class="sec">Zoom</div>
+    <div class="seg" id="zoomSeg">
+      <button class="sbtn on" data-v="all">Full</button>
+      <button class="sbtn" data-v="first5">First 5yr</button>
+      <button class="sbtn" data-v="last5">Last 5yr</button>
+    </div>
+  </div>
+
+  <div style="flex:1"></div>
+  <div class="disc">
+    Inflation: 3% p.a. deterministic.<br>
+    Correlations via Cholesky decomposition.<br>
+    Not financial advice. Illustrative only.
+  </div>
+
+</aside>
+<div class="sb-handle" id="sbHandle"></div>
+
+<main class="cp">
+  <div class="ctop">
+    <div id="btcHint">&#9888; Bitcoin visible — log scale recommended</div>
+    <div class="chart-mode-group">
+      <button class="chart-mode-btn on" id="btnModePan">PAN</button>
+      <button class="chart-mode-btn" id="btnModeSelect">SELECT</button>
+    </div>
+    <button class="chart-widen-btn" id="btnWidenX" style="display:none" title="Zoom out on time axis (Shift+scroll)">&#8592; WIDEN &#8594;</button>
+    <button class="chart-reset-btn" id="btnResetZoom" style="display:none">RESET ZOOM</button>
+  </div>
+  <div class="cw"><canvas id="mainChart"></canvas><div id="selBox" class="sel-box"></div></div>
+  <div class="cfoot">
+    <div class="li"><div class="ll"></div><span class="lt">Median (P50)</span></div>
+    <div class="li"><div class="lb" style="opacity:.6"></div><span class="lt">P25–P75</span></div>
+    <div class="li"><div class="lb" style="opacity:.25"></div><span class="lt">P10–P90</span></div>
+    <div class="li"><div class="ll" style="background:#475569"></div><span class="lt">Inflation</span></div>
+    <span class="fn">Grow-then-rebalance · 200 paths · weekly timestep</span>
+  </div>
+</main>
+</div>
+
+<script>
+'use strict';
+
+// ─── CONFIG ───────────────────────────────────────────────────────────────────
+const INITIAL  = 100_000;
+const N_SIMS   = 200;
+const INF_RATE = 0.03;
+
+// Mutable asset definitions (cagr/sigma edited live by user)
+const ASSETS = [
+  {id:'sp500',   label:'S&P 500',   cagr:0.105, sigma:0.17,  color:'#22d3ee', hex:[34,211,238]},
+  {id:'bonds',   label:'Bonds',     cagr:0.045, sigma:0.06,  color:'#a78bfa', hex:[167,139,250]},
+  {id:'savings', label:'Savings',   cagr:0.035, sigma:0.003, color:'#94a3b8', hex:[148,163,184]},
+  {id:'bitcoin', label:'Bitcoin',   cagr:0.40,  sigma:0.80,  color:'#fb923c', hex:[251,146,60]},
+  {id:'gold',    label:'Gold',      cagr:0.075, sigma:0.16,  color:'#fbbf24', hex:[251,191,36]},
+  {id:'sma',     label:'Quant SMA', cagr:0.20,  sigma:0.14,  color:'#e879f9', hex:[232,121,249]},
+];
+const PORT = {id:'portfolio', label:'Portfolio', color:'#4ade80', hex:[74,222,128]};
+const INF  = {id:'inflation', label:'Inflation', color:'#475569', hex:[71,85,105]};
+
+const btcIdx = ASSETS.findIndex(a => a.id === 'bitcoin');
+
+// Bitcoin power-law + jump-diffusion model
+// Power law: price ~ (weeks_since_genesis)^k  →  annual drift declines over time
+// Jump-diffusion: periodic large crashes, compensated so P50 still tracks power law
+const BTC = {
+  usePowerLaw:  true,
+  genesisWeeks: Math.round(16 * 52), // ~Jan 2009 → end 2024 ≈ 16 years
+  k:            4.50,                // power-law exponent (~40%→8% CAGR over 30yr)
+  jumpLambda:   0.35,               // expected crashes per year
+  jumpLogMean:  -1.05,              // log-space mean crash (-65% crash: exp(-1.05)≈0.35)
+  jumpLogSigma: 0.30,               // crash size spread
+};
+
+// Correlation matrix order: sp500, bonds, savings, bitcoin, gold, sma
+const CORR = [
+  [ 1.00,-0.20, 0.00, 0.30, 0.10, 0.30],
+  [-0.20, 1.00, 0.10, 0.00, 0.20, 0.00],
+  [ 0.00, 0.10, 1.00, 0.00, 0.00, 0.00],
+  [ 0.30, 0.00, 0.00, 1.00, 0.10, 0.20],
+  [ 0.10, 0.20, 0.00, 0.10, 1.00, 0.10],
+  [ 0.30, 0.00, 0.00, 0.20, 0.10, 1.00],
+];
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+const S = {
+  years:   20,
+  mode:    'nominal',
+  scale:   'linear',
+  bands:   'none',
+  zoom:    'all',
+  rebal:   52,
+  active:  new Set([...ASSETS.map(a => a.id), PORT.id, INF.id]),
+  allocs:  [0.30, 0.20, 0.05, 0.10, 0.10, 0.25],
+  simData: null,
+  // interactive zoom/pan state
+  zStart: null, zEnd: null,
+  yMin: null, yMax: null,
+  iMode: 'pan',
+  sidebarOpen: true,
+  _labels: [], _factor: 1, _iStart: 0, _iEnd: 0,
+  chart: null,
+};
+
+// ─── MATH ─────────────────────────────────────────────────────────────────────
+function cholesky(A) {
+  const n = A.length;
+  const L = Array.from({length:n}, () => new Float64Array(n));
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j <= i; j++) {
+      let s = 0;
+      for (let k = 0; k < j; k++) s += L[i][k] * L[j][k];
+      L[i][j] = i === j
+        ? Math.sqrt(Math.max(0, A[i][i] - s))
+        : (L[j][j] > 1e-12 ? (A[i][j] - s) / L[j][j] : 0);
+    }
+  }
+  return L;
+}
+
+const CL = cholesky(CORR);
+
+function randn() {
+  let u; do { u = Math.random(); } while (u === 0);
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * Math.random());
+}
+
+function corrNormals(out) {
+  const z = [randn(), randn(), randn(), randn(), randn(), randn()];
+  for (let i = 0; i < 6; i++) {
+    let x = 0;
+    for (let j = 0; j <= i; j++) x += CL[i][j] * z[j];
+    out[i] = x;
+  }
+}
+
+function percentiles(arr) {
+  const s = arr.slice().sort((a, b) => a - b);
+  const n = s.length;
+  function q(p) {
+    const idx = p * (n - 1), lo = Math.floor(idx), hi = Math.ceil(idx);
+    return s[lo] + (s[hi] - s[lo]) * (idx - lo);
+  }
+  // Stored as 9 values: [p1, p5, p10, p25, p50, p75, p90, p95, p99]
+  // Indices:             [ 0,  1,   2,   3,   4,   5,   6,   7,   8]
+  return [q(.01), q(.05), q(.10), q(.25), q(.50), q(.75), q(.90), q(.95), q(.99)];
+}
+
+// ─── SIMULATION ───────────────────────────────────────────────────────────────
+function simulate(years, rawAllocs, rebalSteps) {
+  const steps = Math.round(+years * 52);
+  const dt    = 1 / 52;
+  const sqDt  = Math.sqrt(dt);
+  const nA    = ASSETS.length;
+
+  const sum    = rawAllocs.reduce((a, b) => a + b, 0);
+  const allocs = sum > 0 ? rawAllocs.map(v => v / sum) : rawAllocs.slice();
+
+  // Base Ito-corrected log-drift: log(1+CAGR)*dt → median path tracks CAGR exactly
+  const drifts = ASSETS.map(a => Math.log(1 + a.cagr) * dt);
+  const sigmas = ASSETS.map(a => a.sigma * sqDt);
+
+  // BTC: precompute per-step log-drift from power law + jump compensation
+  // Jump compensation: adds back the expected log-loss from crashes so P50 stays on target
+  const pJumpW = BTC.jumpLambda / 52; // per-week jump probability
+  const jumpComp = -pJumpW * BTC.jumpLogMean; // positive offset (jumpLogMean < 0)
+
+  const btcDrifts = new Float64Array(steps + 1);
+  for (let t = 1; t <= steps; t++) {
+    let logDrift;
+    if (BTC.usePowerLaw) {
+      const tg = BTC.genesisWeeks + t;
+      // Instantaneous log-return from power law: k * log((tg+1)/tg) per week
+      logDrift = BTC.k * Math.log((tg + 1) / tg);
+    } else {
+      logDrift = drifts[btcIdx];
+    }
+    btcDrifts[t] = logDrift + jumpComp;
+  }
+
+  // Result arrays: [seriesIdx][step][pctile]  (5 pctiles: p10,p25,p50,p75,p90)
+  const nSeries = nA + 1;
+  const res = Array.from({length: nSeries}, () =>
+    Array.from({length: steps + 1}, () => new Float32Array(9).fill(INITIAL))
+  );
+
+  // Per-simulation state
+  const px = Array.from({length: N_SIMS}, () => new Float64Array(nA).fill(INITIAL));
+  const pa = Array.from({length: N_SIMS}, () => {
+    const a = new Float64Array(nA);
+    for (let i = 0; i < nA; i++) a[i] = INITIAL * allocs[i];
+    return a;
+  });
+
+  const doRebal = rebalSteps > 0;
+  const z       = new Array(6);
+  const sBuf    = new Float64Array(N_SIMS);
+  const pBuf    = new Float64Array(N_SIMS);
+
+  for (let t = 1; t <= steps; t++) {
+    for (let s = 0; s < N_SIMS; s++) {
+      corrNormals(z);
+
+      for (let a = 0; a < nA; a++) {
+        const logD = (a === btcIdx) ? btcDrifts[t] : drifts[a];
+        const f    = Math.exp(logD + sigmas[a] * z[a]);
+        px[s][a] *= f;
+        pa[s][a] *= f;
+
+        // Bitcoin crash jump
+        if (a === btcIdx && Math.random() < pJumpW) {
+          const jFactor = Math.exp(BTC.jumpLogMean + BTC.jumpLogSigma * randn());
+          px[s][a] *= jFactor;
+          pa[s][a] *= jFactor;
+        }
+      }
+
+      if (doRebal && t % rebalSteps === 0) {
+        let tot = 0;
+        for (let a = 0; a < nA; a++) tot += pa[s][a];
+        for (let a = 0; a < nA; a++) pa[s][a] = tot * allocs[a];
+      }
+
+      pBuf[s] = 0;
+      for (let a = 0; a < nA; a++) pBuf[s] += pa[s][a];
+    }
+
+    for (let a = 0; a < nA; a++) {
+      for (let s = 0; s < N_SIMS; s++) sBuf[s] = px[s][a];
+      const p = percentiles(sBuf);
+      for (let i = 0; i < 9; i++) res[a][t][i] = p[i];
+    }
+    const pp = percentiles(pBuf);
+    for (let i = 0; i < 9; i++) res[nA][t][i] = pp[i];
+  }
+
+  return {res, steps};
+}
+
+// ─── CHART ────────────────────────────────────────────────────────────────────
+let _chart = null;
+const BORDER_COLOR = '#181840';
+
+function rgba(hex, a) { return `rgba(${hex[0]},${hex[1]},${hex[2]},${a})`; }
+
+function fmtDollar(v) {
+  if (!isFinite(v) || isNaN(v)) return '—';
+  const a = Math.abs(v);
+  if (a >= 1e12) return '$' + (v / 1e12).toFixed(2) + 'T';
+  if (a >= 1e9)  return '$' + (v / 1e9).toFixed(2) + 'B';
+  if (a >= 1e6)  return '$' + (v / 1e6).toFixed(2) + 'M';
+  if (a >= 1e3)  return '$' + (v / 1e3).toFixed(0) + 'K';
+  return '$' + v.toFixed(0);
+}
+
+function buildChart() {
+  if (!S.simData) return;
+  const {res, steps} = S.simData;
+  const nA = ASSETS.length;
+
+  const factor = Math.max(1, Math.floor(steps / 400));
+  const inf = t => S.mode === 'real' ? Math.pow(1 + INF_RATE, t / 52) : 1;
+
+  const labels = [];
+  for (let t = 0; t <= steps; t += factor)
+    labels.push(t % 52 === 0 ? `Yr ${(t / 52) | 0}` : '');
+
+  S._labels = labels; S._factor = factor;
+  let iStart, iEnd;
+  if (S.zStart !== null && S.zEnd !== null) {
+    iStart = Math.max(0, Math.min(S.zStart, labels.length - 2));
+    iEnd   = Math.min(labels.length - 1, Math.max(S.zEnd, iStart + 1));
+  } else {
+    iStart = 0; iEnd = labels.length - 1;
+    if (S.zoom === 'first5') iEnd   = Math.min(iEnd, Math.round(5 * 52 / factor));
+    if (S.zoom === 'last5')  iStart = Math.max(0, iEnd - Math.round(5 * 52 / factor));
+  }
+  S._iStart = iStart; S._iEnd = iEnd;
+
+  const slicedLabels = labels.slice(iStart, iEnd + 1);
+
+  function getPoints(rArr, pIdx) {
+    const out = [];
+    for (let t = 0; t <= steps; t += factor) {
+      const idx = Math.round(t / factor);
+      if (idx < iStart || idx > iEnd) continue;
+      out.push(rArr[t][pIdx] / inf(t));
+    }
+    return out;
+  }
+
+  const base = {pointRadius:0, tension:0, borderWidth:0, fill:false};
+  const datasets = [];
+
+  const series = [
+    ...ASSETS.map((a, i) => ({...a, ri: i})),
+    {...PORT, ri: nA},
+  ];
+
+  // Percentile index map: [p1,p5,p10,p25,p50,p75,p90,p95,p99]
+  //                        [ 0,  1,  2,  3,  4,  5,  6,  7,  8]
+  // outer/inner: [hiIdx, loIdx]
+  const BAND_CFG = {
+    'both':    { outer:[6,2], outerA:.08, inner:[5,3], innerA:.20 },
+    'outer':   { outer:[6,2], outerA:.12 },
+    'inner':   {                           inner:[5,3], innerA:.25 },
+    'none':    {},
+    'wide':    { outer:[7,1], outerA:.07, inner:[6,2], innerA:.15 },
+    'extreme': { outer:[8,0], outerA:.05, inner:[7,1], innerA:.11 },
+  };
+  const bc = BAND_CFG[S.bands] || {};
+
+  for (const ser of series) {
+    const hidden = !S.active.has(ser.id);
+    const rArr   = res[ser.ri];
+
+    if (bc.outer) {
+      datasets.push({...base, data: getPoints(rArr, bc.outer[0]), hidden, fill: '+1', backgroundColor: rgba(ser.hex, bc.outerA)});
+      datasets.push({...base, data: getPoints(rArr, bc.outer[1]), hidden});
+    }
+    if (bc.inner) {
+      datasets.push({...base, data: getPoints(rArr, bc.inner[0]), hidden, fill: '+1', backgroundColor: rgba(ser.hex, bc.innerA)});
+      datasets.push({...base, data: getPoints(rArr, bc.inner[1]), hidden});
+    }
+    datasets.push({
+      ...base, label: ser.label, data: getPoints(rArr, 4),
+      hidden, borderWidth: 2, borderColor: ser.color,
+    });
+  }
+
+  // Inflation reference line
+  const infData = [];
+  for (let t = 0; t <= steps; t += factor) {
+    const idx = Math.round(t / factor);
+    if (idx < iStart || idx > iEnd) continue;
+    infData.push(S.mode === 'real' ? INITIAL : INITIAL * Math.pow(1 + INF_RATE, t / 52));
+  }
+  datasets.push({
+    label: 'Inflation', data: infData,
+    hidden: !S.active.has(INF.id),
+    borderColor: INF.color, borderWidth: 1.5,
+    borderDash: [5, 4], backgroundColor: 'transparent',
+    fill: false, pointRadius: 0, tension: 0,
+  });
+
+  if (_chart) { _chart.destroy(); _chart = null; S.chart = null; }
+
+  const ctx   = document.getElementById('mainChart').getContext('2d');
+  const isLog = S.scale === 'log';
+
+  _chart = new Chart(ctx, {
+    type: 'line',
+    data: {labels: slicedLabels, datasets},
+    options: {
+      animation: false,
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {mode: 'index', intersect: false},
+      plugins: {
+        legend: {display: false},
+        tooltip: {
+          filter: item => !!item.dataset.label,
+          itemSort: (a, b) => (a.dataset.label || '').localeCompare(b.dataset.label || ''),
+          backgroundColor: '#08081e',
+          borderColor: '#181848',
+          borderWidth: 1,
+          titleColor: '#4a5278',
+          bodyColor: '#dde4f5',
+          padding: 10,
+          bodyFont: {family: 'JetBrains Mono', size: 11},
+          titleFont: {family: 'JetBrains Mono', size: 10},
+          callbacks: {
+            title: items => {
+              const globalIdx = iStart + items[0].dataIndex;
+              const yr = (globalIdx * factor / 52).toFixed(1);
+              return `Year ${yr}  |  ${S.mode === 'real' ? 'Real (inflation-adj.)' : 'Nominal'}`;
+            },
+            label: item => item.dataset.label
+              ? ` ${item.dataset.label}: ${fmtDollar(item.raw)}`
+              : null,
+          },
+        },
+      },
+      scales: {
+        x: {
+          type: 'category',
+          grid: {color: '#1e2050', drawTicks: false},
+          border: {color: BORDER_COLOR},
+          ticks: {
+            color: '#9aa2cc', maxRotation: 0, autoSkip: false,
+            callback: (_, i) => slicedLabels[i] || null,
+            font: {family: 'JetBrains Mono', size: 9},
+          },
+        },
+        y: {
+          type: isLog ? 'logarithmic' : 'linear',
+          min: S.yMin !== null ? S.yMin : (isLog ? undefined : 0),
+          max: S.yMax !== null ? S.yMax : undefined,
+          grid: {color: '#1e2050'},
+          border: {color: BORDER_COLOR},
+          ticks: {
+            color: '#9aa2cc',
+            callback: fmtDollar,
+            font: {family: 'JetBrains Mono', size: 9},
+          },
+        },
+        y2: {
+          type: isLog ? 'logarithmic' : 'linear',
+          position: 'right',
+          min: S.yMin !== null ? S.yMin : (isLog ? undefined : 0),
+          max: S.yMax !== null ? S.yMax : undefined,
+          grid: {drawOnChartArea: false},
+          border: {color: BORDER_COLOR},
+          ticks: {
+            color: '#9aa2cc',
+            callback: fmtDollar,
+            font: {family: 'JetBrains Mono', size: 9},
+          },
+        },
+      },
+    },
+  });
+
+  S.chart = _chart;
+
+  const btcOn = S.active.has('bitcoin');
+  document.getElementById('btcHint').style.display = (btcOn && !isLog) ? 'block' : 'none';
+
+  const rb = document.getElementById('btnResetZoom');
+  if (rb) rb.style.display = (S.zStart !== null || S.yMin !== null) ? 'inline-block' : 'none';
+  const wb = document.getElementById('btnWidenX');
+  if (wb) wb.style.display = S.zStart !== null ? 'inline-block' : 'none';
+}
+
+// ─── UI ───────────────────────────────────────────────────────────────────────
+function buildAssetList() {
+  const el = document.getElementById('assetList');
+  const all = [...ASSETS, PORT, INF];
+  for (const item of all) {
+    const rate = 'cagr' in item ? `${(item.cagr * 100).toFixed(0)}% CAGR` : '';
+    const [r, g, b] = item.hex;
+    const btn = document.createElement('button');
+    btn.className = 'abtn on';
+    btn.dataset.id = item.id;
+    btn.id = 'abtn_' + item.id;
+    btn.style.cssText = `--c:${item.color};--cr:${r};--cg:${g};--cb:${b}`;
+    btn.innerHTML = `<span class="dot"></span><span class="albl">${item.label}</span>${rate ? `<span class="arat" id="arat_${item.id}">${rate}</span>` : ''}`;
+    btn.onclick = () => {
+      S.active.has(item.id) ? S.active.delete(item.id) : S.active.add(item.id);
+      btn.classList.toggle('on', S.active.has(item.id));
+      buildChart();
+    };
+    el.appendChild(btn);
+  }
+}
+
+function syncAssetLabel(idx) {
+  const a  = ASSETS[idx];
+  const el = document.getElementById('arat_' + a.id);
+  if (el) el.textContent = `${(a.cagr * 100).toFixed(1)}% CAGR`;
+}
+
+function buildAssumptions() {
+  const grid = document.getElementById('assumpGrid');
+  grid.innerHTML = '';
+
+  function hdr(t) {
+    const d = document.createElement('div');
+    d.className = 'ag-hdr'; d.textContent = t; return d;
+  }
+  grid.appendChild(document.createElement('div'));
+  grid.appendChild(hdr('CAGR %'));
+  grid.appendChild(hdr('Vol %'));
+
+  for (let i = 0; i < ASSETS.length; i++) {
+    const a = ASSETS[i];
+    const isBtc = i === btcIdx;
+
+    // Name
+    const nameEl = document.createElement('div');
+    nameEl.className = 'ag-name';
+    nameEl.textContent = a.label.split(' ')[0];
+
+    // For BTC: add power-law toggle pill in name cell
+    if (isBtc) {
+      const tag = document.createElement('span');
+      tag.className = 'pl-tag' + (BTC.usePowerLaw ? '' : ' off');
+      tag.title = BTC.usePowerLaw
+        ? 'Using power-law declining CAGR. Click to use manual CAGR.'
+        : 'Using manual CAGR. Click to restore power-law.';
+      tag.textContent = 'PwrLaw';
+      tag.onclick = () => { BTC.usePowerLaw = !BTC.usePowerLaw; buildAssumptions(); };
+      nameEl.appendChild(tag);
+    }
+    grid.appendChild(nameEl);
+
+    // CAGR input
+    const cagrInp = document.createElement('input');
+    cagrInp.type = 'number'; cagrInp.className = 'ag-inp';
+    cagrInp.min = '-50'; cagrInp.max = '300'; cagrInp.step = '0.1';
+
+    if (isBtc && BTC.usePowerLaw) {
+      // Show approximate starting CAGR from power law, read-only
+      const tg0 = BTC.genesisWeeks;
+      const approxCAGR = (Math.pow((tg0 + 52) / tg0, BTC.k) - 1) * 100;
+      cagrInp.value = approxCAGR.toFixed(1);
+      cagrInp.disabled = true;
+      cagrInp.title = 'Controlled by power law (CAGR declines over time)';
+    } else {
+      cagrInp.value = (a.cagr * 100).toFixed(1);
+      cagrInp.title = 'Annual CAGR %';
+      cagrInp.onchange = () => {
+        ASSETS[i].cagr = parseFloat(cagrInp.value) / 100;
+        syncAssetLabel(i);
+      };
+    }
+    grid.appendChild(cagrInp);
+
+    // Vol input
+    const volInp = document.createElement('input');
+    volInp.type = 'number'; volInp.className = 'ag-inp';
+    volInp.min = '0'; volInp.max = '300'; volInp.step = '0.1';
+    volInp.value = (a.sigma * 100).toFixed(1);
+    volInp.title = 'Annual volatility % (1σ)';
+    volInp.onchange = () => { ASSETS[i].sigma = parseFloat(volInp.value) / 100; };
+    grid.appendChild(volInp);
+  }
+
+  // BTC model note
+  const note = document.getElementById('btcNote');
+  if (BTC.usePowerLaw) {
+    const crashPct = Math.round((1 - Math.exp(BTC.jumpLogMean)) * 100);
+    note.textContent =
+      `BTC power law (k=${BTC.k}): CAGR declines ` +
+      `as market matures. Crash model: ~${Math.round(BTC.jumpLambda * 12)}x/yr, ` +
+      `avg –${crashPct}% per event. Many paths go near-zero; few paths soar.`;
+  } else {
+    note.textContent = 'BTC: manual CAGR + crash model still active.';
+  }
+}
+
+function buildSliders() {
+  const el = document.getElementById('allocRows');
+  el.innerHTML = '';
+  for (let i = 0; i < ASSETS.length; i++) {
+    const a   = ASSETS[i];
+    const pct = Math.round(S.allocs[i] * 100);
+    const row = document.createElement('div');
+    row.className = 'arow';
+    row.innerHTML = `
+      <span class="an" title="${a.label}">${a.label.split(' ')[0]}</span>
+      <input type="range" min="0" max="100" step="1" value="${pct}" data-i="${i}" style="--tc:${a.color}">
+      <span class="av" id="av${i}">${pct}%</span>`;
+    el.appendChild(row);
+    row.querySelector('input').addEventListener('input', function () {
+      S.allocs[+this.dataset.i] = +this.value / 100;
+      document.getElementById('av' + this.dataset.i).textContent = this.value + '%';
+      updateTotal();
+    });
+  }
+  updateTotal();
+}
+
+function updateTotal() {
+  const tot = S.allocs.reduce((a, b) => a + b, 0);
+  const pct = Math.round(tot * 100);
+  const el  = document.getElementById('atotal');
+  el.textContent = `Total: ${pct}%`;
+  el.className   = Math.abs(pct - 100) <= 1 ? 'ok' : 'err';
+}
+
+function seg(id, key, cb) {
+  const el = document.getElementById(id);
+  el.querySelectorAll('.sbtn').forEach(btn => {
+    btn.onclick = () => {
+      el.querySelectorAll('.sbtn').forEach(b => b.classList.remove('on'));
+      btn.classList.add('on');
+      S[key] = btn.dataset.v;
+      if (cb) cb();
+    };
+  });
+}
+
+// ─── DRAG RESIZE ──────────────────────────────────────────────────────────────
+function initResize() {
+  const sb     = document.getElementById('sidebar');
+  const handle = document.getElementById('sbHandle');
+  let dragging = false;
+
+  handle.addEventListener('mousedown', e => {
+    dragging = true;
+    handle.classList.add('active');
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const w = e.clientX;
+    if (w >= 190 && w <= 520) sb.style.width = w + 'px';
+  });
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    handle.classList.remove('active');
+    document.body.style.userSelect = '';
+  });
+}
+
+// ─── INTERACTIVE FEATURES ─────────────────────────────────────────────────────
+
+let _rafPending = false;
+function buildChartRAF() {
+  if (_rafPending) return;
+  _rafPending = true;
+  requestAnimationFrame(() => { _rafPending = false; buildChart(); });
+}
+
+// Fast Y-only update — skips full chart rebuild, just adjusts the Y scale in place
+function updateYOnly() {
+  if (!S.chart) return;
+  const isLog = S.scale === 'log';
+  S.chart.options.scales.y.min = S.yMin !== null ? S.yMin : (isLog ? undefined : 0);
+  S.chart.options.scales.y.max = S.yMax !== null ? S.yMax : undefined;
+  S.chart.options.scales.y2.type = isLog ? 'logarithmic' : 'linear';
+  S.chart.options.scales.y2.min = S.yMin !== null ? S.yMin : (isLog ? undefined : 0);
+  S.chart.options.scales.y2.max = S.yMax !== null ? S.yMax : undefined;
+  S.chart.update('none');
+  const rb = document.getElementById('btnResetZoom');
+  if (rb) rb.style.display = (S.zStart !== null || S.yMin !== null) ? 'inline-block' : 'none';
+  const wb = document.getElementById('btnWidenX');
+  if (wb) wb.style.display = S.zStart !== null ? 'inline-block' : 'none';
+}
+let _yRafPending = false;
+function updateYOnlyRAF() {
+  if (_yRafPending) return;
+  _yRafPending = true;
+  requestAnimationFrame(() => { _yRafPending = false; updateYOnly(); });
+}
+
+// Lock the Y axis to the current auto-computed scale (prevents auto-rescale during X pan)
+function lockY() {
+  if (S.yMin === null && S.chart) {
+    const ys = S.chart.scales.y;
+    S.yMin = ys.min;
+    S.yMax = ys.max;
+  }
+}
+
+function pixelToSliceIndex(chart, px) {
+  const ca = chart.chartArea, n = chart.data.labels.length;
+  if (n < 2) return 0;
+  return Math.max(0, Math.min(n - 1, Math.round(((px - ca.left) / (ca.right - ca.left)) * (n - 1))));
+}
+function currentGlobalOffset() {
+  return S.zStart !== null ? S.zStart : S._iStart;
+}
+
+function initSidebarToggle() {
+  const sb = document.getElementById('sidebar'), handle = document.getElementById('sbHandle');
+  const btn = document.getElementById('sbToggle');
+  btn.addEventListener('click', () => {
+    S.sidebarOpen = !S.sidebarOpen;
+    sb.classList.toggle('collapsed', !S.sidebarOpen);
+    handle.classList.toggle('sb-hidden', !S.sidebarOpen);
+    btn.classList.toggle('collapsed', !S.sidebarOpen);
+    setTimeout(() => { if (S.chart) S.chart.resize(); }, 280);
+  });
+}
+
+function initMobileSidebar() {
+  const sb = document.getElementById('sidebar'), overlay = document.getElementById('sbOverlay');
+  const burger = document.getElementById('hamburger');
+  function open()  { sb.classList.add('mobile-open'); overlay.classList.add('visible'); document.body.style.overflow = 'hidden'; }
+  function close() { sb.classList.remove('mobile-open'); overlay.classList.remove('visible'); document.body.style.overflow = ''; }
+  burger.addEventListener('click', () => sb.classList.contains('mobile-open') ? close() : open());
+  overlay.addEventListener('click', close);
+  let tsx = 0;
+  sb.addEventListener('touchstart', e => { tsx = e.touches[0].clientX; }, {passive: true});
+  sb.addEventListener('touchend',   e => { if (tsx - e.changedTouches[0].clientX > 50) close(); }, {passive: true});
+}
+
+function initChartModeToggle() {
+  const p = document.getElementById('btnModePan'), s = document.getElementById('btnModeSelect');
+  function setMode(m) {
+    S.iMode = m;
+    p.classList.toggle('on', m === 'pan');
+    s.classList.toggle('on', m === 'select');
+    document.querySelector('.cw').style.cursor = m === 'select' ? 'crosshair' : 'grab';
+  }
+  p.addEventListener('click', () => setMode('pan'));
+  s.addEventListener('click', () => setMode('select'));
+  document.getElementById('btnResetZoom').addEventListener('click', () => {
+    S.zStart = null; S.zEnd = null; S.yMin = null; S.yMax = null; buildChart();
+  });
+  document.getElementById('btnWidenX').addEventListener('click', widenX);
+}
+
+function widenX() {
+  if (!S._labels.length) return;
+  const maxIdx = S._labels.length - 1;
+  const curStart = S.zStart !== null ? S.zStart : S._iStart;
+  const curEnd   = S.zEnd   !== null ? S.zEnd   : S._iEnd;
+  const win = curEnd - curStart;
+  const mid = Math.round((curStart + curEnd) / 2);
+  const newWin = Math.min(maxIdx, Math.round(win * 1.6)); // expand ~60% each press
+  const newStart = Math.max(0, mid - Math.floor(newWin / 2));
+  const newEnd   = Math.min(maxIdx, newStart + newWin);
+  // If we've reached the full range, clear the custom zoom
+  if (newStart <= S._iStart && newEnd >= S._iEnd) {
+    S.zStart = null; S.zEnd = null;
+  } else {
+    S.zStart = newStart; S.zEnd = newEnd;
+  }
+  buildChart();
+}
+
+function initDragSelect() {
+  const canvas = document.getElementById('mainChart'), selBox = document.getElementById('selBox');
+  let dragging = false, startPx = 0, startSlice = 0;
+  function cx(e) { return (e.touches ? e.touches[0].clientX : e.clientX) - canvas.getBoundingClientRect().left; }
+  canvas.addEventListener('mousedown', e => {
+    if (S.iMode !== 'select' || !S.chart) return;
+    const px = cx(e), ca = S.chart.chartArea;
+    if (px < ca.left || px > ca.right) return;
+    dragging = true; startPx = px; startSlice = pixelToSliceIndex(S.chart, px);
+    selBox.style.cssText = `display:block;left:${px}px;width:0`;
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', e => {
+    if (!dragging || S.iMode !== 'select') return;
+    const px = cx(e), l = Math.min(startPx, px), w = Math.abs(px - startPx);
+    selBox.style.left = l + 'px'; selBox.style.width = w + 'px';
+  });
+  document.addEventListener('mouseup', e => {
+    if (!dragging || S.iMode !== 'select') return;
+    dragging = false; selBox.style.display = 'none';
+    const px = cx(e); if (Math.abs(px - startPx) < 5) return;
+    const endSlice = pixelToSliceIndex(S.chart, px);
+    const off = currentGlobalOffset();
+    S.zStart = off + Math.min(startSlice, endSlice);
+    S.zEnd   = off + Math.max(startSlice, endSlice);
+    S.yMin = null; S.yMax = null;
+    buildChart();
+  });
+}
+
+function initPan() {
+  const canvas = document.getElementById('mainChart');
+  let panActive = false, startX = 0, startY = 0, panGS = 0, panGE = 0;
+  let panYMin = null, panYMax = null;
+  function getPos(e) {
+    const r = canvas.getBoundingClientRect(), s = e.touches ? e.touches[0] : e;
+    return { x: s.clientX - r.left, y: s.clientY - r.top };
+  }
+  function getWindow() { return S.zStart !== null ? [S.zStart, S.zEnd] : [S._iStart, S._iEnd]; }
+  canvas.addEventListener('mousedown', e => {
+    if (S.iMode !== 'pan' || !S.chart) return;
+    const pos = getPos(e), ca = S.chart.chartArea;
+    if (pos.x < ca.left || pos.x > ca.right) return;
+    lockY(); // freeze Y so X panning doesn't trigger auto-rescale
+    panActive = true; startX = pos.x; startY = pos.y;
+    [panGS, panGE] = getWindow();
+    panYMin = S.yMin; panYMax = S.yMax;
+    canvas.style.cursor = 'grabbing'; document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', e => {
+    if (!panActive || S.iMode !== 'pan' || !S.chart) return;
+    const pos = getPos(e), ca = S.chart.chartArea, n = S.chart.data.labels.length;
+    // X pan
+    if (n >= 2) {
+      const step = (ca.right - ca.left) / (n - 1);
+      const deltaX = Math.round((startX - pos.x) / step);
+      const win = panGE - panGS, max = S._labels.length - 1 - win;
+      S.zStart = Math.max(0, Math.min(max, panGS + deltaX));
+      S.zEnd   = S.zStart + win;
+    }
+    // Y pan: drag DOWN = see higher values (inverted / natural "scroll" feel)
+    const chartH = ca.bottom - ca.top;
+    if (chartH > 0 && panYMin !== null) {
+      const dyPx = pos.y - startY; // positive when dragged down
+      if (S.scale === 'log' && panYMin > 0 && panYMax > 0) {
+        const logRange = Math.log(panYMax / panYMin);
+        const logShift = (dyPx / chartH) * logRange;
+        S.yMin = panYMin * Math.exp(logShift);
+        S.yMax = panYMax * Math.exp(logShift);
+      } else {
+        const yRange = panYMax - panYMin;
+        S.yMin = panYMin + (dyPx / chartH) * yRange;
+        S.yMax = panYMax + (dyPx / chartH) * yRange;
+      }
+    }
+    buildChartRAF();
+  });
+  document.addEventListener('mouseup', () => {
+    if (!panActive) return;
+    panActive = false; canvas.style.cursor = 'grab'; document.body.style.userSelect = '';
+  });
+}
+
+function initScrollZoom() {
+  const canvas = document.getElementById('mainChart');
+  canvas.addEventListener('wheel', e => {
+    if (!S.chart) return;
+    e.preventDefault();
+    const ca = S.chart.chartArea, rect = canvas.getBoundingClientRect();
+    const my = e.clientY - rect.top;
+    if (my < ca.top || my > ca.bottom) return;
+
+    if (e.shiftKey) {
+      // Shift+scroll = X axis zoom (in/out on time)
+      // scroll up = zoom IN (narrower window); scroll down = zoom OUT (wider window)
+      const f = e.deltaY < 0 ? 0.82 : 1 / 0.82;
+      const maxIdx = S._labels.length - 1;
+      const curStart = S.zStart !== null ? S.zStart : S._iStart;
+      const curEnd   = S.zEnd   !== null ? S.zEnd   : S._iEnd;
+      const win = curEnd - curStart;
+      const mid = (curStart + curEnd) / 2;
+      const newWin = Math.round(win * f);
+      if (newWin < 4) return; // don't zoom in tighter than 4 data points
+      const newStart = Math.max(0, Math.round(mid - newWin / 2));
+      const newEnd   = Math.min(maxIdx, newStart + newWin);
+      if (newStart <= S._iStart && newEnd >= S._iEnd) {
+        S.zStart = null; S.zEnd = null;
+      } else {
+        S.zStart = newStart; S.zEnd = newEnd;
+      }
+      buildChartRAF();
+      return;
+    }
+
+    // Normal scroll = Y axis zoom
+    lockY();
+    const cMin = S.yMin, cMax = S.yMax;
+    // scroll up (deltaY < 0) = zoom IN; scroll down = zoom OUT
+    const f = e.deltaY < 0 ? 0.82 : 1 / 0.82;
+    if (S.scale === 'log' && cMin > 0) {
+      const lc = (Math.log(cMax) + Math.log(cMin)) / 2;
+      const lh = (Math.log(cMax) - Math.log(cMin)) / 2;
+      const newLh = lh * f;
+      if (newLh < 0.05) return;
+      S.yMin = Math.exp(lc - newLh);
+      S.yMax = Math.exp(lc + newLh);
+    } else {
+      const center = (cMin + cMax) / 2, half = (cMax - cMin) / 2;
+      const newHalf = half * f;
+      if (newHalf < 500) return;
+      S.yMax = center + newHalf;
+      S.yMin = Math.max(0, center - newHalf);
+    }
+    updateYOnlyRAF();
+  }, {passive: false});
+}
+
+function initTouch() {
+  const canvas = document.getElementById('mainChart');
+  let tpActive = false, tStartX = 0, tStartY = 0, tGS = 0, tGE = 0;
+  let tYMin = null, tYMax = null;
+  let pinchActive = false, pinchDist = 0, pinchYMin = 0, pinchYMax = 0, pinchGS = 0, pinchGE = 0;
+  function tdist(e) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX, dy = e.touches[0].clientY - e.touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+  function getWindow() { return S.zStart !== null ? [S.zStart, S.zEnd] : [S._iStart, S._iEnd]; }
+
+  canvas.addEventListener('touchstart', e => {
+    if (!S.chart) return;
+    if (e.touches.length === 1) {
+      tpActive = true; pinchActive = false;
+      tStartX = e.touches[0].clientX; tStartY = e.touches[0].clientY;
+      [tGS, tGE] = getWindow();
+      lockY();
+      tYMin = S.yMin; tYMax = S.yMax;
+      e.preventDefault();
+    } else if (e.touches.length === 2) {
+      tpActive = false; pinchActive = true;
+      pinchDist = tdist(e);
+      const ys = S.chart.scales.y;
+      pinchYMin = S.yMin !== null ? S.yMin : ys.min;
+      pinchYMax = S.yMax !== null ? S.yMax : ys.max;
+      [pinchGS, pinchGE] = getWindow();
+      e.preventDefault();
+    }
+  }, {passive: false});
+
+  canvas.addEventListener('touchmove', e => {
+    if (!S.chart) return; e.preventDefault();
+    if (tpActive && e.touches.length === 1) {
+      const ca = S.chart.chartArea, n = S.chart.data.labels.length;
+      // X pan
+      if (n >= 2) {
+        const step = (ca.right - ca.left) / (n - 1);
+        const deltaX = Math.round((tStartX - e.touches[0].clientX) / step);
+        const win = tGE - tGS, max = S._labels.length - 1 - win;
+        S.zStart = Math.max(0, Math.min(max, tGS + deltaX)); S.zEnd = S.zStart + win;
+      }
+      // Y pan: drag down = see higher values (same inversion as mouse pan)
+      const chartH = ca.bottom - ca.top;
+      if (chartH > 0 && tYMin !== null) {
+        const dyPx = e.touches[0].clientY - tStartY; // positive = dragged down
+        if (S.scale === 'log' && tYMin > 0 && tYMax > 0) {
+          const logRange = Math.log(tYMax / tYMin);
+          const logShift = (dyPx / chartH) * logRange;
+          S.yMin = tYMin * Math.exp(logShift);
+          S.yMax = tYMax * Math.exp(logShift);
+        } else {
+          const yRange = tYMax - tYMin;
+          S.yMin = tYMin + (dyPx / chartH) * yRange;
+          S.yMax = tYMax + (dyPx / chartH) * yRange;
+        }
+      }
+      buildChartRAF();
+    } else if (pinchActive && e.touches.length === 2) {
+      const scale = pinchDist / tdist(e); // > 1 = zooming out, < 1 = zooming in
+      // Y zoom (log-aware)
+      if (S.scale === 'log' && pinchYMin > 0) {
+        const lc = (Math.log(pinchYMax) + Math.log(pinchYMin)) / 2;
+        const lh = (Math.log(pinchYMax) - Math.log(pinchYMin)) / 2 * scale;
+        if (lh > 0.05) { S.yMin = Math.exp(lc - lh); S.yMax = Math.exp(lc + lh); }
+      } else {
+        const mid = (pinchYMax + pinchYMin) / 2, half = (pinchYMax - pinchYMin) / 2 * scale;
+        if (half > 500) { S.yMax = mid + half; S.yMin = Math.max(0, mid - half); }
+      }
+      // X zoom
+      const win = Math.max(4, Math.round((pinchGE - pinchGS) * scale));
+      const midIdx = Math.round((pinchGS + pinchGE) / 2);
+      S.zStart = Math.max(0, midIdx - Math.floor(win / 2));
+      S.zEnd   = Math.min(S._labels.length - 1, S.zStart + win);
+      buildChartRAF();
+    }
+  }, {passive: false});
+
+  canvas.addEventListener('touchend', e => {
+    if (e.touches.length === 0) { tpActive = false; pinchActive = false; }
+    else if (e.touches.length === 1) {
+      pinchActive = false; tpActive = true;
+      tStartX = e.touches[0].clientX; tStartY = e.touches[0].clientY;
+      [tGS, tGE] = getWindow();
+      lockY();
+      tYMin = S.yMin; tYMax = S.yMax;
+    }
+  }, {passive: false});
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+function triggerSim() {
+  const ld = document.getElementById('loading');
+  ld.classList.remove('hidden');
+  setTimeout(() => {
+    S.simData = simulate(+S.years, S.allocs, +S.rebal);
+    buildChart();
+    ld.classList.add('hidden');
+  }, 30);
+}
+
+function init() {
+  buildAssetList();
+  buildSliders();
+  buildAssumptions();
+  initResize();
+  initSidebarToggle();
+  initMobileSidebar();
+  initChartModeToggle();
+
+  seg('horizSeg', 'years', triggerSim);
+  seg('modeSeg',  'mode',  buildChart);
+  seg('scaleSeg', 'scale', () => { S.yMin = null; S.yMax = null; buildChart(); });
+  seg('bandsSeg', 'bands', buildChart);
+  seg('zoomSeg',  'zoom',  () => { S.zStart = null; S.zEnd = null; S.yMin = null; S.yMax = null; buildChart(); });
+
+  document.getElementById('rebalSel').onchange = e => {
+    S.rebal = +e.target.value;
+    triggerSim();
+  };
+  document.getElementById('runBtn').onclick = triggerSim;
+
+  triggerSim();
+
+  setTimeout(() => {
+    initDragSelect();
+    initPan();
+    initScrollZoom();
+    initTouch();
+    document.querySelector('.cw').style.cursor = 'grab';
+  }, 200);
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+<div id="sbOverlay" class="sb-overlay"></div>
+</body>
+</html>
