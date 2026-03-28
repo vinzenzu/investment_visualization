@@ -676,6 +676,10 @@ function buildChart() {
             callback: fmtDollar,
             font: {family: 'JetBrains Mono', size: 9},
           },
+          afterDataLimits: axis => {
+            const y = axis.chart.scales.y;
+            if (y) { axis.min = y.min; axis.max = y.max; }
+          },
         },
       },
     },
